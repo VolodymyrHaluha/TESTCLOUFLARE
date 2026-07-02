@@ -1,0 +1,306 @@
+Так, тепер робимо так, щоб **`volodya-haluha.site` відкривав Flask-сайт з твого комп’ютера через Cloudflare Tunnel**.
+
+Схема:
+
+```text
+volodya-haluha.site
+↓
+Cloudflare DNS
+↓
+Cloudflare Tunnel
+↓
+твоєму ПК
+↓
+http://127.0.0.1:5000
+```
+
+Cloudflare Tunnel саме для цього підходить: `cloudflared` встановлює вихідне з’єднання до Cloudflare, а потім public hostname направляється на локальний сервіс, наприклад `localhost:8080`; вхідні порти відкривати не потрібно. ([Cloudflare Docs][1])
+
+---
+
+## 1. Додай домен у Cloudflare
+
+Зайди в Cloudflare:
+
+```text
+https://dash.cloudflare.com
+```
+
+Далі:
+
+```text
+Websites → Add a domain
+```
+
+Введи:
+
+```text
+volodya-haluha.site
+```
+
+Вибери безкоштовний тариф **Free**.
+
+Cloudflare після додавання домену дасть тобі **2 nameservers**. Вони будуть виглядати приблизно так:
+
+```text
+name1.ns.cloudflare.com
+name2.ns.cloudflare.com
+```
+
+У кожного домену nameservers можуть бути різні, тому скопіюй саме ті, які Cloudflare покаже для `volodya-haluha.site`. Cloudflare офіційно пише, що для full setup потрібно додати домен, перевірити DNS і змінити nameservers у реєстратора. ([Cloudflare Docs][2])
+
+---
+
+## 2. Заміни nameservers у Hostinger
+
+Тепер заходиш у Hostinger:
+
+```text
+hPanel → Domains → volodya-haluha.site → DNS / Nameservers
+```
+
+Далі натисни:
+
+```text
+Change Nameservers
+```
+
+Обери варіант типу:
+
+```text
+Use custom nameservers
+```
+
+або:
+
+```text
+Change nameservers
+```
+
+І встав 2 nameservers, які дав Cloudflare.
+
+Hostinger у своїй інструкції описує шлях: hPanel → DNS → вибрати домен → DNS / Nameservers → Change Nameservers. ([Hostinger][3])
+
+Після цього в Cloudflare натисни:
+
+```text
+Check nameservers
+```
+
+Активація може бути не миттєва. Іноді це кілька хвилин, іноді довше. Cloudflare пише, що nameservers треба оновити, щоб активувати домен і використовувати більшість сервісів Cloudflare. ([Cloudflare Docs][4])
+
+---
+
+## 3. Коли домен стане Active — створи Tunnel
+
+У Cloudflare відкрий:
+
+```text
+Zero Trust → Networks → Tunnels
+```
+
+або в новому інтерфейсі:
+
+```text
+Networking → Tunnels
+```
+
+Натисни:
+
+```text
+Create Tunnel
+```
+
+Cloudflare у документації вказує саме шлях **Networking → Tunnels → Create Tunnel** для створення тунелю. ([Cloudflare Docs][5])
+
+Назва тунелю:
+
+```text
+frop-local
+```
+
+Далі вибери:
+
+```text
+Cloudflared
+```
+
+Потім:
+
+```text
+Windows
+```
+
+Cloudflare покаже команду для запуску connector.
+
+---
+
+## 4. Не встановлюй як service, якщо хочеш запуск через server.bat
+
+Cloudflare може показати команду типу:
+
+```bat
+cloudflared.exe service install eyJhIjoi...
+```
+
+Але якщо ти хочеш, щоб сайт працював **тільки коли відкритий server.bat**, краще не встановлювати як службу Windows.
+
+Тобі потрібен токен, який починається приблизно так:
+
+```text
+eyJhIjoi...
+```
+
+Його треба запускати так:
+
+```bat
+"C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel run --token ТУТ_ТВІЙ_TOKEN
+```
+
+---
+
+## 5. Додай Public Hostname
+
+У створеному Tunnel знайди розділ:
+
+```text
+Public Hostname
+```
+
+або:
+
+```text
+Routes → Add route → Published application
+```
+
+Додай так:
+
+```text
+Subdomain: залишити пустим
+Domain: volodya-haluha.site
+Type: HTTP
+URL: 127.0.0.1:5000
+```
+
+Це означає:
+
+```text
+volodya-haluha.site → http://127.0.0.1:5000
+```
+
+Cloudflare описує Published applications як можливість публікувати локальні застосунки в інтернет через public hostname, наприклад `docs.example.com → https://localhost:8080`. ([Cloudflare Docs][6])
+
+Для тесту я би ще додав окремо:
+
+```text
+Subdomain: test
+Domain: volodya-haluha.site
+Type: HTTP
+URL: 127.0.0.1:5000
+```
+
+Тоді буде:
+
+```text
+test.volodya-haluha.site → http://127.0.0.1:5000
+```
+
+---
+
+## 6. Перевір Flask локально
+
+У тебе Flask має відкриватися тут:
+
+```text
+http://127.0.0.1:5000
+```
+
+Якщо локально не відкривається — домен теж не відкриється.
+
+---
+
+## 7. Готовий server.bat
+
+Після того як Cloudflare дасть token, зроби `server.bat` приблизно так:
+
+```bat
+@echo off
+title FROP Flask + Cloudflare Tunnel
+
+cd /d C:\Users\Frop\Desktop\ТВІЙ_ПРОЄКТ
+
+call venv\Scripts\activate
+
+start /B python app.py
+
+timeout /t 5 > nul
+
+"C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel run --token ТУТ_ТВІЙ_ДОВГИЙ_TOKEN
+
+pause
+```
+
+Якщо в тебе немає `venv`, тоді:
+
+```bat
+@echo off
+title FROP Flask + Cloudflare Tunnel
+
+cd /d C:\Users\Frop\Desktop\ТВІЙ_ПРОЄКТ
+
+start /B python app.py
+
+timeout /t 5 > nul
+
+"C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel run --token ТУТ_ТВІЙ_ДОВГИЙ_TOKEN
+
+pause
+```
+
+---
+
+## 8. Як має працювати після налаштування
+
+```text
+server.bat відкритий
+↓
+Flask працює
+↓
+cloudflared працює
+↓
+volodya-haluha.site відкривається
+```
+
+```text
+server.bat закритий
+↓
+cloudflared зупинений
+↓
+volodya-haluha.site не працює
+```
+
+---
+
+## Найкоротший порядок дій
+
+```text
+1. Cloudflare → Add domain → volodya-haluha.site
+2. Скопіювати 2 Cloudflare nameservers
+3. Hostinger → Domains → volodya-haluha.site → DNS / Nameservers
+4. Замінити nameservers на Cloudflare
+5. Дочекатися Active у Cloudflare
+6. Cloudflare → Zero Trust / Networking → Tunnels → Create Tunnel
+7. Назва: frop-local
+8. Public Hostname: volodya-haluha.site → http://127.0.0.1:5000
+9. Запустити Flask
+10. Запустити cloudflared через token або server.bat
+```
+
+Найперше зараз зроби: **додай `volodya-haluha.site` у Cloudflare і заміни nameservers у Hostinger на ті, які дасть Cloudflare**.
+
+[1]: https://developers.cloudflare.com/tunnel/?utm_source=chatgpt.com "Cloudflare Tunnel"
+[2]: https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/?utm_source=chatgpt.com "Change your nameservers (Full setup) · Cloudflare DNS docs"
+[3]: https://www.hostinger.com/support/1696789-how-to-change-nameservers-at-hostinger/?utm_source=chatgpt.com "How to Change Nameservers at Hostinger"
+[4]: https://developers.cloudflare.com/dns/nameservers/update-nameservers/?utm_source=chatgpt.com "Update nameservers - DNS"
+[5]: https://developers.cloudflare.com/tunnel/setup/?utm_source=chatgpt.com "Set up Cloudflare Tunnel"
+[6]: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/?utm_source=chatgpt.com "Published applications · Cloudflare One docs"
