@@ -304,3 +304,225 @@ volodya-haluha.site не працює
 [4]: https://developers.cloudflare.com/dns/nameservers/update-nameservers/?utm_source=chatgpt.com "Update nameservers - DNS"
 [5]: https://developers.cloudflare.com/tunnel/setup/?utm_source=chatgpt.com "Set up Cloudflare Tunnel"
 [6]: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/?utm_source=chatgpt.com "Published applications · Cloudflare One docs"
+
+
+
+На цьому екрані ти намагаєшся додати **Google login**. Тут не можна просто натиснути Save — треба спочатку створити **OAuth Client** у Google Cloud і взяти звідти:
+
+```text
+Client ID
+Client secret
+```
+
+Cloudflare прямо пише, що для Google як identity provider треба створити OAuth client у Google Cloud, а потім вставити в Cloudflare **Client ID** і **Client Secret**. ([Cloudflare Docs][1])
+
+## Найпростіший варіант для тебе
+
+Якщо ти хочеш просто вхід через код на пошту, то **Google зараз не потрібен**.
+
+Тоді натисни:
+
+```text
+← Back to add a login method
+```
+
+І вибери:
+
+```text
+One-time PIN
+```
+
+Cloudflare One-time PIN надсилає одноразовий код на дозволену email-адресу; для доступу достатньо додати пошту в Access policy. ([Cloudflare Docs][2])
+
+Тобто для тебе буде:
+
+```text
+volodya-haluha.site
+↓
+Cloudflare Access
+↓
+вводиш galuga2005@gmail.com
+↓
+приходить код на пошту
+↓
+вводиш код
+↓
+сайт відкривається
+```
+
+Це найпростіше й без Google Cloud.
+
+---
+
+## Якщо хочеш саме кнопку Google
+
+Тоді роби так.
+
+### 1. Відкрий Google Cloud Console
+
+Перейди в:
+
+```text
+https://console.cloud.google.com
+```
+
+Далі створи новий project, наприклад:
+
+```text
+Cloudflare Access Login
+```
+
+### 2. Відкрий Credentials
+
+У Google Cloud:
+
+```text
+APIs & Services → Credentials
+```
+
+Потім:
+
+```text
+Configure Consent Screen
+```
+
+Для звичайного Gmail вибери:
+
+```text
+External
+```
+
+Cloudflare у своїй інструкції також вказує для звичайного Google/Gmail вибирати **External**, бо це не Google Workspace. ([Cloudflare Docs][1])
+
+### 3. Створи OAuth client
+
+Після consent screen:
+
+```text
+Create OAuth client
+```
+
+Application type:
+
+```text
+Web application
+```
+
+Назва, наприклад:
+
+```text
+Cloudflare Access
+```
+
+### 4. Додай Authorized JavaScript origins
+
+Треба вказати твій Cloudflare Access team domain:
+
+```text
+https://ТВІЙ_TEAM_NAME.cloudflareaccess.com
+```
+
+Твій team name можна знайти в Cloudflare:
+
+```text
+Zero Trust → Settings → Team name and domain
+```
+
+Cloudflare у документації пише, що саме team domain треба додати в **Authorized JavaScript origins**. ([Cloudflare Docs][1])
+
+### 5. Додай Authorized redirect URI
+
+У Google Cloud треба додати:
+
+```text
+https://ТВІЙ_TEAM_NAME.cloudflareaccess.com/cdn-cgi/access/callback
+```
+
+Наприклад, якщо team name у тебе:
+
+```text
+galuga2005
+```
+
+тоді буде:
+
+```text
+https://galuga2005.cloudflareaccess.com/cdn-cgi/access/callback
+```
+
+Cloudflare прямо вказує такий redirect URI для Google integration. ([Cloudflare Docs][1])
+
+### 6. Скопіюй Client ID і Client Secret
+
+Після створення Google покаже:
+
+```text
+OAuth Client ID
+Client secret
+```
+
+Скопіюй їх і встав на сторінці, яку ти зараз відкрив:
+
+```text
+Client ID → вставляєш OAuth Client ID
+Client secret → вставляєш Client secret
+```
+
+**Client secret нікому не показуй і не скидай у чат**, бо це як пароль для OAuth-застосунку.
+
+### 7. Поле Email claim
+
+У полі:
+
+```text
+Email claim
+```
+
+можна вписати:
+
+```text
+email
+```
+
+Або залишити пустим, якщо Cloudflare не вимагає. Якщо після збереження будуть проблеми з визначенням пошти — постав `email`.
+
+### 8. Збережи й протестуй
+
+Після Save перейди:
+
+```text
+Zero Trust → Integrations → Identity providers
+```
+
+Біля Google натисни:
+
+```text
+Test
+```
+
+Cloudflare радить тестувати IdP через кнопку **Test** після налаштування. ([Cloudflare Docs][3])
+
+---
+
+## Що я раджу конкретно тобі
+
+Зараз краще не мучити Google OAuth. Для твого сайту простіше:
+
+```text
+Back to add a login method
+→ One-time PIN
+→ Save
+```
+
+А в Access Application залиш:
+
+```text
+Policy:
+Include → Emails → galuga2005@gmail.com
+```
+
+Це дасть саме доступ по пошті без зайвого налаштування Google Cloud.
+
+[1]: https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/google/ "Google · Cloudflare One docs"
+[2]: https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/ "One-time PIN login · Cloudflare One docs"
+[3]: https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/?utm_source=chatgpt.com "Identity providers - Cloudflare One"
